@@ -2,12 +2,21 @@ import express from 'express';
 import axios from 'axios';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from root directory (where index.html and others are located)
+app.use(express.static(__dirname));
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
@@ -34,6 +43,13 @@ function escapeHtml(text) {
     .replace(/"/g, '"')
     .replace(/'/g, '&#39;');
 }
+
+app.options('/send-message', (req, res) => {
+  // Respond to CORS preflight request
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.sendStatus(204);
+});
 
 app.post('/send-message', async (req, res) => {
   const { message, anonymous } = req.body || {};
@@ -112,23 +128,6 @@ app.post('/send-message', async (req, res) => {
     console.error('unexpected error in /send-message', err?.stack || err);
     return res.status(500).json({ ok: false, error: 'failed to send' });
   }
-});
-
-// simple status page so visiting http://localhost:PORT shows something useful
-app.get('/', (req, res) => {
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(`
-    <html>
-      <head><title>Telegram Relay</title></head>
-      <body style="font-family:system-ui,Segoe UI,Roboto,Arial;margin:2rem;color:#222">
-        <h1>Telegram Relay Server</h1>
-        <p>This server receives POST <code>/send-message</code> and forwards messages to your Telegram bot.</p>
-        <p>POST example (JSON): <code>{ "message": "Hello" }</code></p>
-        <p>Bot: <strong>${process.env.BOT_TOKEN ? 'configured' : 'not configured'}</strong></p>
-        <p>Chat target: <strong>${process.env.CHAT_ID || 'not configured'}</strong></p>
-      </body>
-    </html>
-  `);
 });
 
 app.listen(PORT, () => {
